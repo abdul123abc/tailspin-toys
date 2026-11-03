@@ -1,6 +1,35 @@
 import { test, expect, type Response } from '@playwright/test';
 
 test.describe('Game Listing and Navigation', () => {
+  test('should sort games by title and star rating', async ({ page }) => {
+    await page.goto('/');
+
+    const sortControl = page.getByRole('combobox', { name: 'Sort games' });
+    const gameCards = page.getByTestId('game-card');
+    await expect(sortControl).toBeVisible();
+    await expect(sortControl).toHaveAttribute('data-testid', 'game-sort');
+
+    const ascendingTitles = await gameCards.evaluateAll((cards) =>
+      cards.map((card) => (card as HTMLElement).dataset.gameTitle),
+    );
+
+    await sortControl.selectOption('title-desc');
+    await expect.poll(async () =>
+      gameCards.evaluateAll((cards) => cards.map((card) => (card as HTMLElement).dataset.gameTitle)),
+    ).toEqual([...ascendingTitles].reverse());
+
+    await sortControl.selectOption('rating-desc');
+    const ratings = await gameCards.evaluateAll((cards) =>
+      cards.map((card) => {
+        const rating = (card as HTMLElement).dataset.gameStarRating;
+        return rating ? Number(rating) : null;
+      }),
+    );
+    const ratedGames = ratings.filter((rating): rating is number => rating !== null);
+    expect(ratedGames).toEqual([...ratedGames].sort((a, b) => b - a));
+    expect(ratings.slice(ratedGames.length)).toEqual(Array(ratings.length - ratedGames.length).fill(null));
+  });
+
   test('should display games with titles on index page', async ({ page }) => {
     await test.step('Navigate to homepage', async () => {
       await page.goto('/');
