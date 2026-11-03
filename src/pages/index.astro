@@ -5,10 +5,11 @@ import PageHero from '../components/PageHero.astro';
 import EmptyState from '../components/EmptyState.astro';
 import { getDatabase } from '../lib/db';
 import { getAllGames } from '../lib/games';
+import { sortGames } from '../lib/game-sorting';
 
 export const prerender = true;
 
-const games = await getAllGames(getDatabase());
+const games = sortGames(await getAllGames(getDatabase()), 'title-asc');
 ---
 
 <Layout title="Tailspin Toys - Crowdfunding your new favorite game!">
@@ -24,10 +25,48 @@ const games = await getAllGames(getDatabase());
       {games.length === 0 ? (
         <EmptyState text="No games available at the moment." />
       ) : (
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="games-grid">
-          {games.map((game) => <GameCard game={game} />)}
-        </div>
+        <>
+          <div class="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label for="game-sort" class="text-sm font-medium text-slate-200">Sort games</label>
+            <select
+              id="game-sort"
+              data-testid="game-sort"
+              class="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="title-asc">Title (A–Z)</option>
+              <option value="title-desc">Title (Z–A)</option>
+              <option value="rating-desc">Star rating (highest first)</option>
+            </select>
+            <p class="text-sm text-slate-400">Games without a star rating appear last when sorting by rating.</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="games-grid">
+            {games.map((game) => <GameCard game={game} />)}
+          </div>
+        </>
       )}
     </div>
   </div>
 </Layout>
+
+<script>
+  import { sortGames } from '../lib/game-sorting';
+
+  const sortControl = document.querySelector<HTMLSelectElement>('[data-testid="game-sort"]');
+  const gamesGrid = document.querySelector<HTMLElement>('[data-testid="games-grid"]');
+
+  if (sortControl && gamesGrid) {
+    sortControl.addEventListener('change', () => {
+      const sort = sortControl.value;
+      if (sort !== 'title-asc' && sort !== 'title-desc' && sort !== 'rating-desc') return;
+
+      const gameCards = Array.from(gamesGrid.querySelectorAll<HTMLAnchorElement>('[data-testid="game-card"]'))
+        .map((element) => ({
+          element,
+          title: element.dataset.gameTitle ?? '',
+          starRating: element.dataset.gameStarRating ? Number(element.dataset.gameStarRating) : null,
+        }));
+
+      gamesGrid.append(...sortGames(gameCards, sort).map(({ element }) => element));
+    });
+  }
+</script>
